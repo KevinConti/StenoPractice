@@ -22,7 +22,7 @@ import Words exposing (oneSyllableWords)
 
 
 main =
-    Browser.element
+    Browser.document
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -155,14 +155,22 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
-    case model.currentMode of
-        NoModeSelected ->
-            displayModes
+type alias Document msg =
+    { title : String
+    , body : List (Html msg)
+    }
 
-        BasicMode ->
-            playGame model.currentWord model.userInput model.completedWordCount
+
+view : Model -> Document Msg
+view model =
+    Document "Steno Practice"
+        [ case model.currentMode of
+            NoModeSelected ->
+                displayModes
+
+            BasicMode ->
+                playGame model.currentWord model.userInput model.completedWordCount
+        ]
 
 
 displayModes : Html Msg
