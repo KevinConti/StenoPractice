@@ -206,4 +206,6 @@ playGame currentWord userInput completedWordCount =
             []
         , p [] [ "Completed words: " ++ String.fromInt completedWordCount |> text ]
         , button [ onClick (ModeSelected NoModeSelected) ] [ "End game" |> text ]
+        , p [] [ "User Input: " ++ userInput |> text ]
+        , p [] [ "Answer: " ++ currentWord |> text ]
         ]
