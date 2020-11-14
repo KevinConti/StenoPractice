@@ -99,7 +99,7 @@ update msg model =
                 ( { model | currentWord = newWord }, Cmd.none )
 
         UserInput answer input ->
-            if answer == input then
+            if String.trim answer == String.trim input then
                 ( { model
                     | completedWordCount = model.completedWordCount + 1
                     , userInput = ""
