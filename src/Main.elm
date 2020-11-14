@@ -139,7 +139,7 @@ getRandomNumber maybeList =
             else
                 maybeList
     in
-    Random.generate GotRandomNumber (Random.int 0 (List.length list))
+    Random.generate GotRandomNumber (Random.int 0 (List.length list - 1))
 
 
 
