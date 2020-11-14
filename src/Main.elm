@@ -1,10 +1,3 @@
--- Make a GET request to load a book called "Public Opinion"
---
--- Read how it works:
---   https://guide.elm-lang.org/effects/http.html
---
-
-
 module Main exposing (..)
 
 import Browser
