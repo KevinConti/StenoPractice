@@ -37,12 +37,6 @@ type alias Model =
     }
 
 
-type alias WordList =
-    { currentWord : String
-    , currentList : List String
-    }
-
-
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( initModel
@@ -54,7 +48,7 @@ initModel : Model
 initModel =
     { userInput = ""
     , wordList = WordList "" []
-    , currentMode = NoModeSelected
+    , currentMode = NoMode
     , completedWordCount = 0
     , remainingTime = 0
     }
@@ -66,7 +60,7 @@ initModel =
 
 type Msg
     = GotRandomNumber Int
-    | ModeSelected Mode
+    | ModeSelected ModeRequestMsg
     | UserInput String String
     | Tick Time.Posix
 
@@ -74,8 +68,8 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ModeSelected mode ->
-            updateModeSelected model mode
+        ModeSelected modeRequestMsg ->
+            updateModeSelected model modeRequestMsg
 
         GotRandomNumber randomNum ->
             updateGotRandomNumber model randomNum
@@ -87,7 +81,7 @@ update msg model =
             if model.remainingTime - 1 <= 0 then
                 ( { model
                     | remainingTime = 0
-                    , currentMode = NoModeSelected
+                    , currentMode = NoMode
                     , wordList = WordList "" []
                   }
                 , Cmd.none
@@ -97,12 +91,29 @@ update msg model =
                 ( { model | remainingTime = model.remainingTime - 1 }, Cmd.none )
 
 
-updateModeSelected : Model -> Mode -> ( Model, Cmd Msg )
-updateModeSelected model mode =
-    case mode of
+
+-- This is where we assign the list for the given mode
+
+
+mapModeRequestMsg : ModeRequestMsg -> Mode
+mapModeRequestMsg modeRequestMsg =
+    case modeRequestMsg of
+        NoModeSelected ->
+            NoMode
+
+        BasicMode ->
+            Basic (WordList "" oneSyllableWords)
+
+        TimedMode innerMode ->
+            Timed (mapModeRequestMsg innerMode)
+
+
+updateModeSelected : Model -> ModeRequestMsg -> ( Model, Cmd Msg )
+updateModeSelected model modeRequestMsg =
+    case modeRequestMsg of
         TimedMode modeType ->
             ( { model
-                | currentMode = mode
+                | currentMode = modeRequestMsg |> mapModeRequestMsg
                 , remainingTime = 60
                 , wordList = WordList model.wordList.currentWord oneSyllableWords
                 , completedWordCount = 0
@@ -112,7 +123,7 @@ updateModeSelected model mode =
 
         BasicMode ->
             ( { model
-                | currentMode = mode
+                | currentMode = modeRequestMsg |> mapModeRequestMsg
                 , wordList = WordList model.wordList.currentWord oneSyllableWords
                 , completedWordCount = 0
               }
@@ -121,7 +132,7 @@ updateModeSelected model mode =
 
         NoModeSelected ->
             ( { model
-                | currentMode = mode
+                | currentMode = modeRequestMsg |> mapModeRequestMsg
                 , wordList = WordList "" []
                 , remainingTime = 0
               }
@@ -201,7 +212,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     -- Create a subscription that sends a Tick message every second for Timed modes
     case model.currentMode of
-        TimedMode _ ->
+        Timed _ ->
             Time.every 1000 Tick
 
         _ ->
@@ -222,7 +233,7 @@ view : Model -> Document Msg
 view model =
     Document "Steno Practice"
         [ case model.currentMode of
-            NoModeSelected ->
+            NoMode ->
                 displayModes model.completedWordCount
 
             _ ->
