@@ -75,63 +75,13 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ModeSelected mode ->
-            case mode of
-                TimedMode modeType ->
-                    ( { model
-                        | currentMode = mode
-                        , remainingTime = 60
-                        , wordList = WordList model.wordList.currentWord oneSyllableWords
-                        , completedWordCount = 0
-                      }
-                    , getRandomNumber model.wordList.currentList
-                    )
-
-                BasicMode ->
-                    ( { model
-                        | currentMode = mode
-                        , wordList = WordList model.wordList.currentWord oneSyllableWords
-                        , completedWordCount = 0
-                      }
-                    , getRandomNumber model.wordList.currentList
-                    )
-
-                NoModeSelected ->
-                    ( { model
-                        | currentMode = mode
-                        , wordList = WordList "" []
-                        , remainingTime = 0
-                      }
-                    , Cmd.none
-                    )
+            updateModeSelected model mode
 
         GotRandomNumber randomNum ->
-            let
-                newWord =
-                    case indexAt randomNum model.wordList.currentList of
-                        Nothing ->
-                            "Error - indexAt experienced an issue. Index: " ++ String.fromInt randomNum
-
-                        Just a ->
-                            a
-            in
-            -- Prevent duplicate word request
-            if newWord == model.wordList.currentWord then
-                ( model, getRandomNumber model.wordList.currentList )
-
-            else
-                ( { model | wordList = WordList newWord model.wordList.currentList }, Cmd.none )
+            updateGotRandomNumber model randomNum
 
         UserInput answer input ->
-            if String.trim answer == String.trim input then
-                ( { model
-                    | completedWordCount = model.completedWordCount + 1
-                    , userInput = ""
-                  }
-                , getRandomNumber model.wordList.currentList
-                )
-
-            else
-                ( { model | userInput = input }, Cmd.none )
+            updateUserInput model answer input
 
         Tick _ ->
             if model.remainingTime - 1 <= 0 then
@@ -145,6 +95,71 @@ update msg model =
 
             else
                 ( { model | remainingTime = model.remainingTime - 1 }, Cmd.none )
+
+
+updateModeSelected : Model -> Mode -> ( Model, Cmd Msg )
+updateModeSelected model mode =
+    case mode of
+        TimedMode modeType ->
+            ( { model
+                | currentMode = mode
+                , remainingTime = 60
+                , wordList = WordList model.wordList.currentWord oneSyllableWords
+                , completedWordCount = 0
+              }
+            , getRandomNumber model.wordList.currentList
+            )
+
+        BasicMode ->
+            ( { model
+                | currentMode = mode
+                , wordList = WordList model.wordList.currentWord oneSyllableWords
+                , completedWordCount = 0
+              }
+            , getRandomNumber model.wordList.currentList
+            )
+
+        NoModeSelected ->
+            ( { model
+                | currentMode = mode
+                , wordList = WordList "" []
+                , remainingTime = 0
+              }
+            , Cmd.none
+            )
+
+
+updateGotRandomNumber : Model -> Int -> ( Model, Cmd Msg )
+updateGotRandomNumber model randomNum =
+    let
+        newWord =
+            case indexAt randomNum model.wordList.currentList of
+                Nothing ->
+                    "Error - indexAt experienced an issue. Index: " ++ String.fromInt randomNum
+
+                Just a ->
+                    a
+    in
+    -- Prevent duplicate word request
+    if newWord == model.wordList.currentWord then
+        ( model, getRandomNumber model.wordList.currentList )
+
+    else
+        ( { model | wordList = WordList newWord model.wordList.currentList }, Cmd.none )
+
+
+updateUserInput : Model -> String -> String -> ( Model, Cmd Msg )
+updateUserInput model answer input =
+    if String.trim answer == String.trim input then
+        ( { model
+            | completedWordCount = model.completedWordCount + 1
+            , userInput = ""
+          }
+        , getRandomNumber model.wordList.currentList
+        )
+
+    else
+        ( { model | userInput = input }, Cmd.none )
 
 
 indexAt : Int -> List a -> Maybe a
