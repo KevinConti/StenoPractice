@@ -197,8 +197,8 @@ updateUserInput model answer input =
 
 indexAt : Int -> List a -> Maybe a
 indexAt index list =
-    if List.length list >= index then
-        List.take index list
+    if List.length list > index && index >= 0 then
+        List.take (index + 1) list
             -- [ 1, 2, 3 ]
             |> List.reverse
             -- [ 3, 2, 1 ]
