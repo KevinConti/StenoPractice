@@ -18,6 +18,28 @@ type Mode
     | Timed Mode
 
 
+
+-- Function that handles the recursive case and handles applying the function correctly
+
+
+mapModes : Mode -> (WordList -> b) -> b -> b
+mapModes mode func default =
+    case mode of
+        NoMode ->
+            default
+
+        Basic wordList ->
+            func wordList
+
+        Timed innerMode ->
+            case innerMode of
+                Basic wordList ->
+                    func wordList
+
+                _ ->
+                    default
+
+
 type alias WordList =
     { currentWord : String
     , currentList : List String

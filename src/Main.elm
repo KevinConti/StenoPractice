@@ -30,7 +30,6 @@ main =
 
 type alias Model =
     { userInput : String
-    , wordList : WordList
     , currentMode : Mode
     , completedWordCount : Int
     , remainingTime : Int
@@ -47,7 +46,6 @@ init _ =
 initModel : Model
 initModel =
     { userInput = ""
-    , wordList = WordList "" []
     , currentMode = NoMode
     , completedWordCount = 0
     , remainingTime = 0
@@ -82,7 +80,6 @@ update msg model =
                 ( { model
                     | remainingTime = 0
                     , currentMode = NoMode
-                    , wordList = WordList "" []
                   }
                 , Cmd.none
                 )
@@ -110,30 +107,32 @@ mapModeRequestMsg modeRequestMsg =
 
 updateModeSelected : Model -> ModeRequestMsg -> ( Model, Cmd Msg )
 updateModeSelected model modeRequestMsg =
-    case modeRequestMsg of
-        TimedMode modeType ->
+    case modeRequestMsg |> mapModeRequestMsg of
+        Timed innerMode ->
             ( { model
-                | currentMode = modeRequestMsg |> mapModeRequestMsg
+                | currentMode = innerMode
                 , remainingTime = 60
-                , wordList = WordList model.wordList.currentWord oneSyllableWords
                 , completedWordCount = 0
               }
-            , getRandomNumber model.wordList.currentList
+            , case innerMode of
+                Basic wordList ->
+                    getRandomNumber wordList.currentList
+
+                _ ->
+                    Cmd.none
             )
 
-        BasicMode ->
+        Basic wordList ->
             ( { model
                 | currentMode = modeRequestMsg |> mapModeRequestMsg
-                , wordList = WordList model.wordList.currentWord oneSyllableWords
                 , completedWordCount = 0
               }
-            , getRandomNumber model.wordList.currentList
+            , getRandomNumber wordList.currentList
             )
 
-        NoModeSelected ->
+        NoMode ->
             ( { model
                 | currentMode = modeRequestMsg |> mapModeRequestMsg
-                , wordList = WordList "" []
                 , remainingTime = 0
               }
             , Cmd.none
@@ -142,35 +141,58 @@ updateModeSelected model modeRequestMsg =
 
 updateGotRandomNumber : Model -> Int -> ( Model, Cmd Msg )
 updateGotRandomNumber model randomNum =
-    let
-        newWord =
-            case indexAt randomNum model.wordList.currentList of
+    case model.currentMode of
+        Basic wordList ->
+            case indexAt randomNum wordList.currentList of
+                Just newWord ->
+                    -- Prevent duplicate word
+                    if newWord == wordList.currentWord then
+                        ( model, getRandomNumber wordList.currentList )
+
+                    else
+                        ( { model | currentMode = Basic (WordList newWord wordList.currentList) }, Cmd.none )
+
                 Nothing ->
-                    "Error - indexAt experienced an issue. Index: " ++ String.fromInt randomNum
+                    ( { model | currentMode = Basic (WordList ("Error: indexAt failed with index: " ++ String.fromInt randomNum) []) }, Cmd.none )
 
-                Just a ->
-                    a
-    in
-    -- Prevent duplicate word request
-    if newWord == model.wordList.currentWord then
-        ( model, getRandomNumber model.wordList.currentList )
-
-    else
-        ( { model | wordList = WordList newWord model.wordList.currentList }, Cmd.none )
+        _ ->
+            ( model, Cmd.none )
 
 
 updateUserInput : Model -> String -> String -> ( Model, Cmd Msg )
 updateUserInput model answer input =
-    if String.trim answer == String.trim input then
-        ( { model
-            | completedWordCount = model.completedWordCount + 1
-            , userInput = ""
-          }
-        , getRandomNumber model.wordList.currentList
-        )
+    case model.currentMode of
+        Basic wordList ->
+            if String.trim answer == String.trim input then
+                ( { model
+                    | completedWordCount = model.completedWordCount + 1
+                    , userInput = ""
+                  }
+                , getRandomNumber wordList.currentList
+                )
 
-    else
-        ( { model | userInput = input }, Cmd.none )
+            else
+                ( { model | userInput = input }, Cmd.none )
+
+        Timed innerMode ->
+            case innerMode of
+                Basic wordList ->
+                    if String.trim answer == String.trim input then
+                        ( { model
+                            | completedWordCount = model.completedWordCount + 1
+                            , userInput = ""
+                          }
+                        , getRandomNumber wordList.currentList
+                        )
+
+                    else
+                        ( { model | userInput = input }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        NoMode ->
+            ( model, Cmd.none )
 
 
 indexAt : Int -> List a -> Maybe a
@@ -232,12 +254,7 @@ type alias Document msg =
 view : Model -> Document Msg
 view model =
     Document "Steno Practice"
-        [ case model.currentMode of
-            NoMode ->
-                displayModes model.completedWordCount
-
-            _ ->
-                playGame model
+        [ Types.mapModes model.currentMode (viewGame model) (displayModes model.completedWordCount)
         ]
 
 
@@ -267,14 +284,14 @@ displayModes completedWordCount =
         ]
 
 
-playGame : Model -> Html Msg
-playGame model =
+viewGame : Model -> WordList -> Html Msg
+viewGame model wordList =
     div
         [ style "text-align" "center"
         ]
-        [ p [] [ model.wordList.currentWord |> text ]
+        [ p [] [ wordList.currentWord |> text ]
         , input
-            [ onInput (UserInput model.wordList.currentWord)
+            [ onInput (UserInput wordList.currentWord)
             , value model.userInput
             ]
             []
