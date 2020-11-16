@@ -178,11 +178,12 @@ displayModes =
             , onClick (ModeSelected BasicMode)
             ]
             [ "Basic Mode" |> text ]
-        , button
-            [ style "padding" "4px"
-            , style "margin-top" "4px"
-            ]
-            [ "Basic Mode - 60 Seconds" |> text ]
+
+        -- , button
+        --     [ style "padding" "4px"
+        --     , style "margin-top" "4px"
+        --     ]
+        --     [ "Basic Mode - 60 Seconds" |> text ]
         ]
 
 
