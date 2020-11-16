@@ -6,6 +6,7 @@ import Html.Attributes exposing (style, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Random
+import Time
 import Types exposing (..)
 import Words exposing (oneSyllableWords)
 
@@ -29,10 +30,16 @@ main =
 
 type alias Model =
     { userInput : String
-    , currentWord : String
-    , currentList : List String
+    , wordList : WordList
     , currentMode : Mode
     , completedWordCount : Int
+    , remainingTime : Int
+    }
+
+
+type alias WordList =
+    { currentWord : String
+    , currentList : List String
     }
 
 
@@ -46,10 +53,10 @@ init _ =
 initModel : Model
 initModel =
     { userInput = ""
-    , currentWord = ""
-    , currentList = []
+    , wordList = WordList "" []
     , currentMode = NoModeSelected
     , completedWordCount = 0
+    , remainingTime = 0
     }
 
 
@@ -61,35 +68,58 @@ type Msg
     = GotRandomNumber Int
     | ModeSelected Mode
     | UserInput String String
+    | Tick Time.Posix
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ModeSelected mode ->
-            ( { model
-                | currentMode = mode
-                , currentList = oneSyllableWords
-              }
-            , getRandomNumber model.currentList
-            )
+            case mode of
+                TimedMode modeType ->
+                    ( { model
+                        | currentMode = mode
+                        , remainingTime = 60
+                        , wordList = WordList model.wordList.currentWord oneSyllableWords
+                        , completedWordCount = 0
+                      }
+                    , getRandomNumber model.wordList.currentList
+                    )
+
+                BasicMode ->
+                    ( { model
+                        | currentMode = mode
+                        , wordList = WordList model.wordList.currentWord oneSyllableWords
+                        , completedWordCount = 0
+                      }
+                    , getRandomNumber model.wordList.currentList
+                    )
+
+                NoModeSelected ->
+                    ( { model
+                        | currentMode = mode
+                        , wordList = WordList "" []
+                        , remainingTime = 0
+                      }
+                    , Cmd.none
+                    )
 
         GotRandomNumber randomNum ->
             let
                 newWord =
-                    case indexAt randomNum model.currentList of
+                    case indexAt randomNum model.wordList.currentList of
                         Nothing ->
-                            "Error - indexAt experienced an issue"
+                            "Error - indexAt experienced an issue. Index: " ++ String.fromInt randomNum
 
                         Just a ->
                             a
             in
             -- Prevent duplicate word request
-            if newWord == model.currentWord then
-                ( model, getRandomNumber model.currentList )
+            if newWord == model.wordList.currentWord then
+                ( model, getRandomNumber model.wordList.currentList )
 
             else
-                ( { model | currentWord = newWord }, Cmd.none )
+                ( { model | wordList = WordList newWord model.wordList.currentList }, Cmd.none )
 
         UserInput answer input ->
             if String.trim answer == String.trim input then
@@ -97,11 +127,24 @@ update msg model =
                     | completedWordCount = model.completedWordCount + 1
                     , userInput = ""
                   }
-                , getRandomNumber model.currentList
+                , getRandomNumber model.wordList.currentList
                 )
 
             else
                 ( { model | userInput = input }, Cmd.none )
+
+        Tick _ ->
+            if model.remainingTime - 1 <= 0 then
+                ( { model
+                    | remainingTime = 0
+                    , currentMode = NoModeSelected
+                    , wordList = WordList "" []
+                  }
+                , Cmd.none
+                )
+
+            else
+                ( { model | remainingTime = model.remainingTime - 1 }, Cmd.none )
 
 
 indexAt : Int -> List a -> Maybe a
@@ -141,7 +184,13 @@ getRandomNumber maybeList =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    -- Create a subscription that sends a Tick message every second for Timed modes
+    case model.currentMode of
+        TimedMode _ ->
+            Time.every 1000 Tick
+
+        _ ->
+            Sub.none
 
 
 
@@ -159,15 +208,15 @@ view model =
     Document "Steno Practice"
         [ case model.currentMode of
             NoModeSelected ->
-                displayModes
+                displayModes model.completedWordCount
 
-            BasicMode ->
-                playGame model.currentWord model.userInput model.completedWordCount
+            _ ->
+                playGame model
         ]
 
 
-displayModes : Html Msg
-displayModes =
+displayModes : Int -> Html Msg
+displayModes completedWordCount =
     div
         [ style "text-align" "center"
         ]
@@ -178,26 +227,36 @@ displayModes =
             , onClick (ModeSelected BasicMode)
             ]
             [ "Basic Mode" |> text ]
+        , button
+            [ style "padding" "4px"
+            , style "margin-top" "4px"
+            , onClick (ModeSelected (TimedMode BasicMode))
+            ]
+            [ "Basic Mode - 60 Seconds" |> text ]
+        , if completedWordCount > 0 then
+            p [] [ "You completed " ++ String.fromInt completedWordCount ++ " words!" |> text ]
 
-        -- , button
-        --     [ style "padding" "4px"
-        --     , style "margin-top" "4px"
-        --     ]
-        --     [ "Basic Mode - 60 Seconds" |> text ]
+          else
+            div [] []
         ]
 
 
-playGame : String -> String -> Int -> Html Msg
-playGame currentWord userInput completedWordCount =
+playGame : Model -> Html Msg
+playGame model =
     div
         [ style "text-align" "center"
         ]
-        [ p [] [ currentWord |> text ]
+        [ p [] [ model.wordList.currentWord |> text ]
         , input
-            [ onInput (UserInput currentWord)
-            , value userInput
+            [ onInput (UserInput model.wordList.currentWord)
+            , value model.userInput
             ]
             []
-        , p [] [ "Completed words: " ++ String.fromInt completedWordCount |> text ]
+        , p [] [ "Completed words: " ++ String.fromInt model.completedWordCount |> text ]
         , button [ onClick (ModeSelected NoModeSelected) ] [ "End game" |> text ]
+        , if model.remainingTime /= 0 then
+            p [] [ "Current time remaining: " ++ String.fromInt model.remainingTime |> text ]
+
+          else
+            p [] []
         ]
